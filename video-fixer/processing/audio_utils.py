@@ -22,7 +22,29 @@ def denoise(input_video: Path, output_video: Path, model: str = "rnnoise") -> No
         import rnnoise_wrapper
 
         denoised_path = audio_path.with_name("denoised.wav")
-        rnnoise_wrapper.denoise(str(audio_path), str(denoised_path))
+
+        if hasattr(rnnoise_wrapper, "denoise"):
+            # old API exposed a convenience function
+            rnnoise_wrapper.denoise(str(audio_path), str(denoised_path))
+        elif hasattr(rnnoise_wrapper, "RNNoise"):
+            # newer versions use an RNNoise class with a filter method
+            rn = rnnoise_wrapper.RNNoise()
+            if hasattr(rn, "filter"):
+                rn.filter(str(audio_path), str(denoised_path))
+            elif hasattr(rn, "process"):
+                rn.process(str(audio_path), str(denoised_path))
+            else:
+                # try calling the instance directly
+                try:
+                    rn(str(audio_path), str(denoised_path))
+                except Exception as exc:  # pragma: no cover - extremely unlikely
+                    raise AttributeError(
+                        "rnnoise_wrapper.RNNoise has no usable filter method"
+                    ) from exc
+        else:
+            raise AttributeError(
+                "rnnoise_wrapper does not provide a denoise interface"
+            )
     else:
         from demucs.apply import apply_model
         from demucs.pretrained import get_model
