@@ -1,11 +1,19 @@
 """Video question-answering using the lightweight SmolVLM2-256M model."""
+
 from __future__ import annotations
 
 import os
 from pathlib import Path
 
 import torch
-from transformers import AutoProcessor, AutoModelForConditionalGeneration
+
+try:  # transformers < 4.40 may not expose AutoModelForConditionalGeneration
+    from transformers import AutoProcessor, AutoModelForConditionalGeneration
+except ImportError:  # pragma: no cover - fallback for older versions
+    from transformers import (
+        AutoProcessor,
+        AutoModelForCausalLM as AutoModelForConditionalGeneration,
+    )
 
 # Pull your HF token from the environment
 HF_TOKEN = os.getenv("HF_TOKEN")
@@ -28,7 +36,9 @@ else:
     _device = "cpu"
 
 
-def _get_model_and_processor() -> tuple[AutoProcessor, AutoModelForConditionalGeneration]:
+def _get_model_and_processor() -> (
+    tuple[AutoProcessor, AutoModelForConditionalGeneration]
+):
     global _processor, _model
     if _processor is None or _model is None:
         # Load both with trust_remote_code so we pull in any custom classes
