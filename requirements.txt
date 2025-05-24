@@ -11,3 +11,4 @@ nltk
 cv2
 pydantic<2
 transformers
+Pillow

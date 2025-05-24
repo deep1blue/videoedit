@@ -5,6 +5,8 @@ import os
 from pathlib import Path
 
 from transformers import pipeline
+import cv2
+from PIL import Image
 
 # Hugging Face authentication token from environment
 HF_TOKEN = os.getenv("HF_TOKEN", None)
@@ -39,6 +41,16 @@ def ask_video_question(video: Path, question: str) -> str:
         The model’s answer as plain text.
     """
     qa = _get_pipeline()
-    # The custom pipeline loaded via trust_remote_code will accept `video_path`
-    result = qa(video_path=str(video), question=question)
+
+    # Extract the first frame to use with image-based VQA pipelines
+    cap = cv2.VideoCapture(str(video))
+    success, frame = cap.read()
+    cap.release()
+    if not success:
+        raise RuntimeError(f"Failed to read video: {video}")
+    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    image = Image.fromarray(frame)
+
+    # Fallback to standard image-based pipeline if the custom pipeline isn't available
+    result = qa(image=image, question=question)
     return result.get("answer", "")
