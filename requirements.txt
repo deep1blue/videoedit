@@ -9,3 +9,4 @@ demucs
 git+https://github.com/dbklim/RNNoise_Wrapper.git@master#egg=rnnoise_wrapper
 nltk
 cv2
+pydantic<2
