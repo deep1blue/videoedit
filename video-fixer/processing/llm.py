@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 
 from transformers import pipeline
+from transformers.pipelines import VideoQuestionAnsweringPipeline
 
 # Hugging Face authentication token from environment
 HF_TOKEN = os.getenv("HF_TOKEN", None)
@@ -13,17 +14,17 @@ HF_TOKEN = os.getenv("HF_TOKEN", None)
 MODEL_NAME = "HuggingFaceTB/SmolVLM2-256M-Video-Instruct"
 
 # Lazy-global so we only load the model once
-_video_qa = None
+_video_qa: VideoQuestionAnsweringPipeline | None = None
 
-def _get_pipeline():
+def _get_pipeline() -> VideoQuestionAnsweringPipeline:
     global _video_qa
     if _video_qa is None:
-        # Use the "visual-question-answering" task name (pipeline registry)
         _video_qa = pipeline(
-            "visual-question-answering",
+            task="visual-question-answering",        # register under a known task
             model=MODEL_NAME,
-            use_auth_token=HF_TOKEN,  # correct auth flag
-            trust_remote_code=True,    # allows any custom pipeline code in the repo
+            use_auth_token=HF_TOKEN,               # correct auth flag
+            trust_remote_code=True,                # load the custom pipeline definition
+            pipeline_class=VideoQuestionAnsweringPipeline,
         )
     return _video_qa
 
@@ -39,6 +40,6 @@ def ask_video_question(video: Path, question: str) -> str:
         The model’s answer as plain text.
     """
     qa = _get_pipeline()
-    # The custom pipeline loaded via trust_remote_code will accept `video_path`
+    # This custom pipeline expects keyword args `video_path` and `question`
     result = qa(video_path=str(video), question=question)
     return result.get("answer", "")
