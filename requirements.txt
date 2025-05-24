@@ -1,0 +1,10 @@
+gradio==4.0.0
+opencv-python
+mediapipe
+vidstab
+ffmpeg-python
+pydub
+faster-whisper
+demucs
+rnnoise-wrapper
+nltk
