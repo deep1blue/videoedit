@@ -3,7 +3,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
+
 from transformers import pipeline
+import os
+
+# Hugging Face authentication token from environment
+HF_TOKEN = os.environ.get("HF_TOKEN")
 
 MODEL_NAME = "apple/smolvlm2"
 
@@ -16,6 +21,7 @@ def _get_pipeline():
         _video_qa = pipeline(
             "video-question-answering",
             model=MODEL_NAME,
+            token=HF_TOKEN,
         )
     return _video_qa
 
