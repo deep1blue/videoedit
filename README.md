@@ -15,6 +15,7 @@ AI-powered quick-fix video editor – turn a raw clip into a polished asset with
 | Denoise Audio       | Cuts hiss, A/C hum, reverb             | RNNoise (default) or Demucs-light                |
 | Normalise Volume    | Broadcast-safe loudness                | ffmpeg `loudnorm` (-14 LUFS)                     |
 | Remove Filler Words | Cuts “um, uh, like” segments           | faster-whisper tiny-int8 + timestamp cuts        |
+| Ask Video           | Answers questions about the uploaded video | SmolVLM2 video QA via Hugging Face |
 
 All operations are functional – each button writes a fresh temp file so users can chain effects in any order.
 
@@ -28,6 +29,7 @@ video-fixer/
 ├── processing/
 │   ├── video_utils.py    # stabilize(), blur_bg(), focus_speaker(), adjust_levels()
 │   ├── audio_utils.py    # denoise(), normalize_gain(), cut_fillers()
+│   ├── llm.py           # ask_video_question()
 │   └── transcript.py     # get_transcript(), find_filler_words()
 └── tmp/                  # ephemeral workspace
 ```
