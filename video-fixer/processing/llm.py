@@ -10,9 +10,9 @@ import torch
 try:  # transformers < 4.40 may not expose AutoModelForConditionalGeneration
     from transformers import AutoProcessor, AutoModelForConditionalGeneration
 except ImportError:  # pragma: no cover - fallback for older versions
-    from transformers import (
-        AutoProcessor,
-        AutoModelForCausalLM as AutoModelForConditionalGeneration,
+    raise ImportError(
+        "Transformers >= 4.40 is required to run the SmolVLM model. "
+        "Please upgrade the 'transformers' package."
     )
 
 # Pull your HF token from the environment
