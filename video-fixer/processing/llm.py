@@ -4,42 +4,69 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from transformers import pipeline
-from transformers.pipelines import VideoQuestionAnsweringPipeline
+import torch
+from transformers import AutoProcessor, AutoModelForConditionalGeneration
 
-# Hugging Face authentication token from environment
-HF_TOKEN = os.getenv("HF_TOKEN", None)
+# Pull your HF token from the environment
+HF_TOKEN = os.getenv("HF_TOKEN")
+if HF_TOKEN is None:
+    raise RuntimeError("Please set the HF_TOKEN environment variable before running.")
 
-# Smallest SmolVLM2 variant for video QA
+# The smallest SmolVLM2 variant with video-QA support
 MODEL_NAME = "HuggingFaceTB/SmolVLM2-256M-Video-Instruct"
 
-# Lazy-global so we only load the model once
-_video_qa: VideoQuestionAnsweringPipeline | None = None
+# Global singletons so we only load once
+_processor: AutoProcessor | None = None
+_model: AutoModelForConditionalGeneration | None = None
 
-def _get_pipeline() -> VideoQuestionAnsweringPipeline:
-    global _video_qa
-    if _video_qa is None:
-        _video_qa = pipeline(
-            task="visual-question-answering",        # register under a known task
-            model=MODEL_NAME,
-            use_auth_token=HF_TOKEN,               # correct auth flag
-            trust_remote_code=True,                # load the custom pipeline definition
-            pipeline_class=VideoQuestionAnsweringPipeline,
+# Pick the best device available
+if torch.cuda.is_available():
+    _device = "cuda"
+elif getattr(torch.backends, "mps", None) and torch.backends.mps.is_available():
+    _device = "mps"
+else:
+    _device = "cpu"
+
+
+def _get_model_and_processor() -> tuple[AutoProcessor, AutoModelForConditionalGeneration]:
+    global _processor, _model
+    if _processor is None or _model is None:
+        # Load both with trust_remote_code so we pull in any custom classes
+        _processor = AutoProcessor.from_pretrained(
+            MODEL_NAME,
+            use_auth_token=HF_TOKEN,
+            trust_remote_code=True,
         )
-    return _video_qa
+        _model = AutoModelForConditionalGeneration.from_pretrained(
+            MODEL_NAME,
+            use_auth_token=HF_TOKEN,
+            trust_remote_code=True,
+        )
+        _model.to(_device)
+    return _processor, _model
+
 
 def ask_video_question(video: Path, question: str) -> str:
     """
     Ask a natural-language question about a video file and return the answer.
 
     Args:
-        video:    Path to the local video file.
-        question: The question you want answered (e.g. "What color is the car?").
+        video: Path to your local video file (e.g. 'tmp/input.mp4').
+        question: A string question (e.g. "What color is the car?").
 
     Returns:
-        The model’s answer as plain text.
+        The model’s text answer.
     """
-    qa = _get_pipeline()
-    # This custom pipeline expects keyword args `video_path` and `question`
-    result = qa(video_path=str(video), question=question)
-    return result.get("answer", "")
+    processor, model = _get_model_and_processor()
+
+    # Prepare inputs: the processor will load & sample frames internally
+    inputs = processor(
+        video=str(video),
+        text=question,
+        return_tensors="pt",
+    ).to(_device)
+
+    # Generate an answer
+    generated = model.generate(**inputs)
+    answer = processor.decode(generated[0], skip_special_tokens=True)
+    return answer
