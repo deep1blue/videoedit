@@ -6,5 +6,6 @@ ffmpeg-python
 pydub
 faster-whisper
 demucs
-rnnoise-wrapper
+git+https://github.com/dbklim/RNNoise_Wrapper.git@master#egg=rnnoise_wrapper
 nltk
+cv2
