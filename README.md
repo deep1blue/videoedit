@@ -46,6 +46,9 @@ video-fixer/
 | ffmpeg  | ≥ 6.0   | Install via Homebrew/apt |
 
 Python libs (see `requirements.txt`): Gradio 4.*, opencv-python, mediapipe, vidstab, ffmpeg-python, pydub, faster-whisper, demucs, rnnoise-wrapper, nltk.
+FastAPI is installed by Gradio and still expects Pydantic v1, so the
+requirements file pins `pydantic<2` to avoid schema errors when the server
+starts.
 
 ---
 
