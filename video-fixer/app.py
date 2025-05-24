@@ -16,6 +16,7 @@ from processing.video_utils import (
 )
 from processing.audio_utils import denoise, normalize_gain, cut_fillers
 from processing.transcript import get_transcript, find_filler_words
+from processing.llm import ask_video_question
 
 TMP_DIR = Path("tmp")
 TMP_DIR.mkdir(exist_ok=True)
@@ -93,6 +94,12 @@ def do_remove_fillers() -> Path:
     return cut_video
 
 
+def do_ask(question: str) -> str:
+    if not state.path:
+        raise gr.Error("No video uploaded")
+    return ask_video_question(state.path, question)
+
+
 def cleanup() -> None:
     shutil.rmtree(TMP_DIR)
     TMP_DIR.mkdir()
@@ -115,6 +122,11 @@ with gr.Blocks() as demo:
         with gr.Column():
             video_out = gr.Video(label="Preview")
 
+    with gr.Row():
+        question_box = gr.Textbox(label="Ask about video")
+        ask_btn = gr.Button("Ask")
+    answer_box = gr.Textbox(label="Answer")
+
     video_in.upload(upload, inputs=video_in, outputs=video_out)
     stabilize_btn.click(do_stabilize, outputs=video_out)
     focus_btn.click(do_focus, outputs=video_out)
@@ -124,6 +136,7 @@ with gr.Blocks() as demo:
     normalize_btn.click(do_normalize, outputs=video_out)
     filler_btn.click(do_remove_fillers, outputs=video_out)
     reset_btn.click(cleanup)
+    ask_btn.click(do_ask, inputs=question_box, outputs=answer_box)
 
 if __name__ == "__main__":
     demo.launch()
