@@ -7,6 +7,8 @@ from pathlib import Path
 
 import torch
 from transformers import AutoProcessor, AutoModel
+import cv2
+from typing import List
 
 # Pull your HF token from the environment
 HF_TOKEN = os.getenv("HF_TOKEN")
@@ -47,6 +49,27 @@ def _get_model_and_processor() -> tuple[AutoProcessor, torch.nn.Module]:
     return _processor, _model
 
 
+def _sample_video_frames(path: Path, num_frames: int = 8) -> List["np.ndarray"]:
+    """Load and uniformly sample up to ``num_frames`` RGB frames from a video."""
+    import numpy as np  # opencv requires numpy but delay import for tests
+
+    cap = cv2.VideoCapture(str(path))
+    total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) or 0
+    step = max(total // num_frames, 1)
+    frames: List[np.ndarray] = []
+    frame_idx = 0
+    while len(frames) < num_frames:
+        cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
+        ret, frame = cap.read()
+        if not ret:
+            break
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        frames.append(frame)
+        frame_idx += step
+    cap.release()
+    return frames
+
+
 def ask_video_question(video: Path, question: str) -> str:
     """
     Ask a natural-language question about a video file and return the answer.
@@ -60,17 +83,10 @@ def ask_video_question(video: Path, question: str) -> str:
     """
     processor, model = _get_model_and_processor()
 
-    # Attempt to pass the raw data to the processor. If "video" param is invalid,
-    # try "inputs", "images", or "pixel_values" based on the remote docs.
-    # We also pass text=question, but keep in mind the param name might be "question" or "prompt".
-    inputs = processor(
-        # If the remote code specifically expects "video", keep it.
-        # But it's throwing a warning "Keyword argument `video` is not valid".
-        # So let's just pass it as the first positional argument or something else.
-        str(video),
-        text=question,
-        return_tensors="pt",
-    ).to(_device)
+    frames = _sample_video_frames(video)
+
+    # Pass frames as images since the processor may not accept a raw video path
+    inputs = processor(images=frames, text=question, return_tensors="pt").to(_device)
 
     # Next, we check if the model has a `.generate()` method:
     if not hasattr(model, "generate"):
