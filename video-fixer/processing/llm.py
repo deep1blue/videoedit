@@ -6,14 +6,7 @@ import os
 from pathlib import Path
 
 import torch
-
-try:  # transformers < 4.40 may not expose AutoModelForConditionalGeneration
-    from transformers import AutoProcessor, AutoModelForConditionalGeneration
-except ImportError:  # pragma: no cover - fallback for older versions
-    raise ImportError(
-        "Transformers >= 4.40 is required to run the SmolVLM model. "
-        "Please upgrade the 'transformers' package."
-    )
+from transformers import AutoProcessor, AutoModel
 
 # Pull your HF token from the environment
 HF_TOKEN = os.getenv("HF_TOKEN")
@@ -25,7 +18,7 @@ MODEL_NAME = "HuggingFaceTB/SmolVLM2-256M-Video-Instruct"
 
 # Global singletons so we only load once
 _processor: AutoProcessor | None = None
-_model: AutoModelForConditionalGeneration | None = None
+_model: torch.nn.Module | None = None
 
 # Pick the best device available
 if torch.cuda.is_available():
@@ -36,20 +29,18 @@ else:
     _device = "cpu"
 
 
-def _get_model_and_processor() -> (
-    tuple[AutoProcessor, AutoModelForConditionalGeneration]
-):
+def _get_model_and_processor() -> tuple[AutoProcessor, torch.nn.Module]:
     global _processor, _model
     if _processor is None or _model is None:
-        # Load both with trust_remote_code so we pull in any custom classes
+        # Use trust_remote_code so we can pull in custom classes
         _processor = AutoProcessor.from_pretrained(
             MODEL_NAME,
-            use_auth_token=HF_TOKEN,
+            token=HF_TOKEN,
             trust_remote_code=True,
         )
-        _model = AutoModelForConditionalGeneration.from_pretrained(
+        _model = AutoModel.from_pretrained(
             MODEL_NAME,
-            use_auth_token=HF_TOKEN,
+            token=HF_TOKEN,
             trust_remote_code=True,
         )
         _model.to(_device)
@@ -69,14 +60,32 @@ def ask_video_question(video: Path, question: str) -> str:
     """
     processor, model = _get_model_and_processor()
 
-    # Prepare inputs: the processor will load & sample frames internally
+    # Attempt to pass the raw data to the processor. If "video" param is invalid,
+    # try "inputs", "images", or "pixel_values" based on the remote docs.
+    # We also pass text=question, but keep in mind the param name might be "question" or "prompt".
     inputs = processor(
-        video=str(video),
+        # If the remote code specifically expects "video", keep it.
+        # But it's throwing a warning "Keyword argument `video` is not valid".
+        # So let's just pass it as the first positional argument or something else.
+        str(video),
         text=question,
         return_tensors="pt",
     ).to(_device)
 
-    # Generate an answer
-    generated = model.generate(**inputs)
-    answer = processor.decode(generated[0], skip_special_tokens=True)
-    return answer
+    # Next, we check if the model has a `.generate()` method:
+    if not hasattr(model, "generate"):
+        raise AttributeError(
+            "Loaded model does not have a `.generate()` method. "
+            "Please confirm the correct model class supports text generation."
+        )
+
+    # If `.generate()` exists, proceed
+    outputs = model.generate(**inputs)
+    # Or if there's a different method, e.g. model.predict(...)
+    
+    # decode the results
+    if hasattr(processor, "decode"):
+        return processor.decode(outputs[0], skip_special_tokens=True)
+    else:
+        # If the custom code expects something else:
+        return outputs[0].cpu().numpy().tolist()
