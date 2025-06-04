@@ -76,6 +76,16 @@ PY
 python app.py  # => http://127.0.0.1:7860
 ```
 
+### Using the helper script
+
+If you'd like to automate these steps, simply run:
+
+```bash
+./run_app.sh
+```
+The script creates the virtual environment, installs requirements, downloads the
+models on first run and launches the app for you.
+
 Docker users:
 
 ```bash
